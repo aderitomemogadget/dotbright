@@ -1042,6 +1042,26 @@ Quick View Styles
   background-position:center center;
   text-indent:-5000px; }
 
+.db-sequra-product-widget {
+  clear: both;
+  width: 100%;
+  max-width: 100%;
+  margin: 12px 0;
+}
+.db-sequra-product-widget[hidden] {
+  display: none !important;
+}
+.db-sequra-product-widget .sequra-promotion-widget {
+  min-height: 80px;
+  width: 100%;
+  max-width: 100%;
+}
+@media (max-width: 767px) {
+  .db-sequra-product-widget {
+    margin: 10px 0;
+  }
+}
+
 /***** IE code ****/
 .ie8 .pb-left-column #image-block #view_full_size .span_link {
   background:#fff;

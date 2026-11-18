@@ -75,3 +75,17 @@ function sequra_sandbox_access_allowed()
     $profile = cliente_perfil($client_id);
     return is_array($profile) && isset($profile['Testes']) && (int) $profile['Testes'] === 1;
 }
+
+function sequra_widget_config()
+{
+    $config = sequra_config();
+    if (!$config['enabled'] || !sequra_sandbox_access_allowed()) return array();
+    foreach (array('merchant_id', 'assets_key', 'product') as $key) {
+        if ($config[$key] === '') return array();
+    }
+    // Only public promotional settings may be exposed to the browser.
+    return array('merchant'=>$config['merchant_id'], 'assetKey'=>$config['assets_key'],
+        'products'=>array($config['product']),
+        'scriptUri'=>($config['sandbox'] ? 'https://sandbox.sequracdn.com' : 'https://live.sequracdn.com') . '/assets/sequra-checkout.min.js',
+        'decimalSeparator'=>',', 'thousandSeparator'=>'.', 'locale'=>$config['culture'], 'currency'=>$config['currency']);
+}

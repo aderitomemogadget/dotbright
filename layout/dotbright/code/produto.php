@@ -1199,6 +1199,30 @@ function ficha_produtoold($prods)
     return $return;	
 }
 
+function sequra_product_widget($prods, $display_price = null)
+{
+    if (empty($GLOBALS['sequra_product_widget_config']) ||
+        (isset($_GET['amp']) && (int) $_GET['amp'] === 1) || empty($prods['prod_carrinho'])) return '';
+    if ($display_price === null && isset($prods['prod_precos'])) {
+        $prices = $prods['prod_precos'];
+        $display_price = $prices['PVP'];
+        // Match the promotion price displayed by ficha_p1_final without changing it.
+        if (isset($prices['PROMOCAO'], $prices['Promo_data_ini'], $prices['Promo_data_fim'], $prices['obj_promo']) &&
+            (int) $prices['PROMOCAO'] === 1 && strtotime($prices['Promo_data_fim']) >= strtotime($prices['Promo_data_ini']) &&
+            $prices['Promo_data_fim'] !== '0000-00-00' && $prices['Promo_data_ini'] !== '0000-00-00') {
+            $display_price = $prices['obj_promo'];
+        }
+    }
+    if (!is_numeric($display_price) || !is_finite((float) $display_price) ||
+        (float) $display_price <= 0) return '';
+    $config = $GLOBALS['sequra_product_widget_config'];
+    $amount = (int) round((float) $display_price * 100);
+    $product = htmlspecialchars($config['products'][0], ENT_QUOTES, 'UTF-8');
+    return '<div class="db-sequra-product-widget" style="clear:both;width:100%;max-width:100%" data-sequra-product-id="' . (int) $prods['prod_id'] . '"' .
+        ($amount < 5000 ? ' hidden' : '') . '><div class="sequra-promotion-widget" style="min-height:80px;width:100%;max-width:100%" data-amount="' . $amount .
+        '" data-product="' . $product . '" data-alignment="left" data-size="M"></div></div>';
+}
+
 function ficha_produto($prods)
 {
 	/* é esta a função da ficha de produto */
@@ -1242,7 +1266,7 @@ function ficha_produto($prods)
 
 
     $return .= '<script>quantityAvailable=9999;</script>';
-    $return .= '<script type="text/javascript" src="layout/'.PROJETO.'/css/css_external/product.js"></script> ';
+    $return .= '<script type="text/javascript" src="layout/'.PROJETO.'/css/css_external/product.js' . (!empty($GLOBALS['sequra_product_widget_config']) ? '?sequra=' . filemtime(__DIR__ . '/../css/css_external/product.js') : '') . '"></script> ';
     $return .= BREADCRUMBS(1, intval($prods['fam_id']));
 
 
@@ -2404,6 +2428,7 @@ function ficha_p1_final($prods,$labels='')
 						}
 					}
 					$return .= '</p>';
+					if (!$reparacoes) $return .= sequra_product_widget($prods);
 
 
 
@@ -3022,6 +3047,7 @@ function ficha_p1_final($prods,$labels='')
 							}
 						}
 					$return .= '</p>';
+					if (!$reparacoes) $return .= sequra_product_widget($prods);
 
 						$return .='<div class="product-form container">';
 							$return .= '<div class="row" style="width:100%;max-width:375px;margin:0">';
@@ -4547,7 +4573,7 @@ function ficha_produto_nstandard($prods)
 	$return='<link rel="stylesheet" href="layout/'.PROJETO.'/css/css_external/product_v_'.filemtime('layout/'.PROJETO.'/css/css_external/product.css').'.css" media="all"/> ';
 
 	$return .= '<script>quantityAvailable=9999;</script>';
-	$return .= '<script type="text/javascript" src="layout/'.PROJETO.'/css/css_external/product.js"></script> ';
+	$return .= '<script type="text/javascript" src="layout/'.PROJETO.'/css/css_external/product.js' . (!empty($GLOBALS['sequra_product_widget_config']) ? '?sequra=' . filemtime(__DIR__ . '/../css/css_external/product.js') : '') . '"></script> ';
     $return .= BREADCRUMBS(1, intval($prods['fam_id']));
 
 
@@ -4710,7 +4736,7 @@ function ficha_produto_nstandard($prods)
 			else if($pvp) $return .= number_format($pvp,2,',','.').' &euro;';
 		}
 
-		$return .= '</p></div>';
+		$return .= '</p>' . sequra_product_widget($prods, $prods['prod_precos']['PVP']) . '</div>';
 
 		$return .= '</div>';
 

@@ -1,4 +1,29 @@
 //global variables
+function updateSequraProductWidgets(price)
+{
+    var widgets = document.querySelectorAll('.db-sequra-product-widget');
+    if (!widgets.length || typeof price !== 'number' || !isFinite(price)) return;
+    var amount = Math.round(price * 100);
+    var changed = false;
+    for (var i = 0; i < widgets.length; i++) {
+        var promotion = widgets[i].querySelector('.sequra-promotion-widget');
+        if (!promotion) continue;
+        widgets[i].hidden = amount < 5000;
+        if (promotion.getAttribute('data-amount') !== String(amount)) {
+            promotion.setAttribute('data-amount', String(amount));
+            changed = true;
+        }
+    }
+    if (!changed || !window.Sequra) return;
+    function refresh() {
+        if (window.Sequra && typeof window.Sequra.refreshComponents === 'function') {
+            try { window.Sequra.refreshComponents(); } catch (error) { /* Keep the existing product flow working if the promotional service fails. */ }
+        }
+    }
+    if (typeof window.Sequra.refreshComponents === 'function') refresh();
+    else if (typeof window.Sequra.onLoad === 'function') window.Sequra.onLoad(refresh);
+}
+
 var selectedCombination=[];
 var globalQuantity=0;
 var colors=[];
@@ -588,6 +613,7 @@ function updatePrice()
 
 
 	$('#our_price_display').text(formatCurrency(priceWithDiscountsDisplay * currencyRate, currencyFormat, currencySign, currencyBlank));
+	updateSequraProductWidgets(priceWithDiscountsDisplay * currencyRate);
 
 	// If the calculated price (after all discounts) is different than the base price
 	// we show the old price striked through

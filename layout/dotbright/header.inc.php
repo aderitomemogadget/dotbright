@@ -534,6 +534,43 @@
 <html lang="<?=$GLOBALS['site_lang']?>">
 <head>
     <meta charset="utf-8">
+    <?php
+    $GLOBALS['sequra_product_widget_config'] = array();
+    if (isset($page_id, $GLOBALS['products_page_id'], $prods['prod_id']) &&
+        $page_id == $GLOBALS['products_page_id'] && (int) $prods['prod_id'] > 0 &&
+        (!isset($_GET['amp']) || (int) $_GET['amp'] !== 1)) {
+        require_once __DIR__ . '/../../external_api/pagamentos/pgm_sequra/sequra_config.php';
+        $GLOBALS['sequra_product_widget_config'] = sequra_widget_config();
+    }
+    if (!empty($GLOBALS['sequra_product_widget_config'])) {
+        $sequra_widget_json = json_encode($GLOBALS['sequra_product_widget_config'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        ?>
+        <script>
+        (function (w, d, config) {
+            if (!config || w.SequraConfiguration || d.getElementById('db-sequra-promotions-script')) return;
+            w.SequraConfiguration = config;
+            w.SequraOnLoad = w.SequraOnLoad || [];
+            w.Sequra = w.Sequra || {};
+            w.Sequra.onLoad = function (callback) { w.SequraOnLoad.push(callback); };
+            w.Sequra.onLoad(function () {
+                function refresh() {
+                    if (w.Sequra && typeof w.Sequra.refreshComponents === 'function') {
+                        try { w.Sequra.refreshComponents(); } catch (error) { /* Promotional failures must not interrupt the product page. */ }
+                    }
+                }
+                if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', refresh);
+                else refresh();
+            });
+            var script = d.createElement('script');
+            script.id = 'db-sequra-promotions-script';
+            script.async = true;
+            script.src = config.scriptUri;
+            d.head.appendChild(script);
+        })(window, document, <?=$sequra_widget_json ? $sequra_widget_json : 'null'?>);
+        </script>
+        <?php
+    }
+    ?>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="robots" content="INDEX,FOLLOW,ARCHIVE">
