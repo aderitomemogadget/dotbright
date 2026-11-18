@@ -3006,7 +3006,45 @@ function carrinho_purchase()
 						{
 							$taxas_adicionais += $metodoPagamentoObj['Taxa'];
 						}
-						showLayoutMetodosPagamento($m_metodopagamento);
+						$sequra_context = null;
+						if (defined('MP_TP_SEQURA'))
+						{
+							require_once __DIR__ . '/../external_api/pagamentos/pgm_sequra/sequra_config.php';
+							require_once __DIR__ . '/../external_api/pagamentos/pgm_sequra/sequra_lib.php';
+							$sequra_billing_country = $m_pais;
+							$sequra_delivery_country = $m2_pais;
+							if ($dados_cliente)
+							{
+								$sequra_billing_address = getEnderecos($dados_cliente['cli_id'], 1, $m_end_faturacao);
+								$sequra_billing_country = $sequra_billing_address->EOF() ? 0 : $sequra_billing_address->db_data['Pais'];
+								$sequra_billing_address->db_close();
+								$sequra_delivery_address = getEnderecos($dados_cliente['cli_id'], 1, $m_end_entrega);
+								$sequra_delivery_country = $sequra_delivery_address->EOF() ? 0 : $sequra_delivery_address->db_data['Pais'];
+								$sequra_delivery_address->db_close();
+							}
+							// Capture the existing cart calculation, including its shipping and voucher rules.
+							// Its HTML is emitted below in the original position; no other method's total changes.
+							$sequra_cart_total = null;
+							ob_start();
+							linhas_encomenda($totalEncomenda, $n_enc, $shop, $portes_adicionais, $taxas_adicionais, $sequra_cart_total);
+							$sequra_cart_html = ob_get_clean();
+							$sequra_context = array('total_without_payment_fee'=>$sequra_cart_total - $taxas_adicionais,
+								'fee_base'=>$totalEncomenda['TOTALCIVA'], 'billing_country'=>$sequra_billing_country,
+								'delivery_country'=>$sequra_delivery_country);
+							if ((int) $metodoPagamentoObj['Tipo'] === (int) MP_TP_SEQURA &&
+								!sequra_checkout_eligible($sequra_cart_total, $sequra_billing_country, $sequra_delivery_country))
+							{
+								$m_metodopagamento = 0;
+								unset($_POST['m_metodopagamento'], $_SESSION['METODO_PAGAMENTO']);
+								$taxas_adicionais = 0;
+								echo show_alerta2('A seQura requer uma encomenda de pelo menos 50 EUR e moradas de faturação e entrega em Portugal. Selecione outro método de pagamento.');
+								ob_start();
+								linhas_encomenda($totalEncomenda, $n_enc, $shop, $portes_adicionais, 0, $sequra_cart_total);
+								$sequra_cart_html = ob_get_clean();
+								$sequra_context['total_without_payment_fee'] = $sequra_cart_total;
+							}
+						}
+						showLayoutMetodosPagamento($m_metodopagamento, $sequra_context);
 					}
 
 					/*echo 'LOG:<br>';
@@ -3017,7 +3055,8 @@ function carrinho_purchase()
 					//****************************************************************************
 					//AGORA VAMOS APRESENTAR O LAYOUT COM OS ARTIGOS E RESPETIVOS TOTAIS
 					//****************************************************************************
-					linhas_encomenda($totalEncomenda,$n_enc,$shop,$portes_adicionais,$taxas_adicionais);
+					if (isset($sequra_cart_html)) echo $sequra_cart_html;
+					else linhas_encomenda($totalEncomenda,$n_enc,$shop,$portes_adicionais,$taxas_adicionais);
 
 
 
@@ -4456,7 +4495,7 @@ function array_flatten($array)
 	return $return;
 }
 
-function linhas_encomenda($totalEncomenda,$n_enc,$shop,$portes_total=0,$taxas=0)
+function linhas_encomenda($totalEncomenda,$n_enc,$shop,$portes_total=0,$taxas=0,&$sequra_cart_total=null)
 {
 	global $m_metodoenvio,$m_pais;
 	global $n_voucher, $voucher,$n_saldo_cartao, $saldo_cartao;
@@ -5277,7 +5316,8 @@ function linhas_encomenda($totalEncomenda,$n_enc,$shop,$portes_total=0,$taxas=0)
 
 //echo $totalEncomenda['TOTALCIVA']." - ".$totalEncomenda['DESCONTOS']." + $PortesCarrinho+$portes_iva + $taxas+$total_extensao_garantia_valor+$totalservicos_extra | ";
 
-						echo numberformat(($totalEncomenda['TOTALCIVA'] - $totalEncomenda['DESCONTOS']) + $PortesCarrinho+$portes_iva + $taxas+$total_extensao_garantia_valor+$totalservicos_extra,1);
+						$sequra_cart_total = ($totalEncomenda['TOTALCIVA'] - $totalEncomenda['DESCONTOS']) + $PortesCarrinho+$portes_iva + $taxas+$total_extensao_garantia_valor+$totalservicos_extra;
+						echo numberformat($sequra_cart_total,1);
 
 						?></strong></div>
 					</div>

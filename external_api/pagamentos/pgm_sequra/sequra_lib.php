@@ -20,6 +20,34 @@ function sequra_valid_order_token($enc_id, $token)
     return $expected !== '' && is_string($token) && hash_equals($expected, $token);
 }
 
+function sequra_checkout_eligible($total, $billing_country, $delivery_country)
+{
+    // country_zones uses 165 for Portugal throughout this store.
+    return is_numeric($total) && is_finite((float) $total) && sequra_money_cents($total) >= 5000 &&
+        (string) $billing_country === '165' && (string) $delivery_country === '165';
+}
+
+function sequra_checkout_total($context, $payment_method)
+{
+    $fee = (int) $payment_method['metodo_taxa_tipo'] === 1 ?
+        (float) $context['fee_base'] * (float) $payment_method['Taxa'] / 100 : (float) $payment_method['Taxa'];
+    return (float) $context['total_without_payment_fee'] + $fee;
+}
+
+function sequra_order_eligible($enc_id)
+{
+    if (!defined('MP_TP_SEQURA') || (int) $enc_id <= 0) return false;
+    $db_link = db_opendb_conection($GLOBALS['DB_host'], $GLOBALS['DB_user'], $GLOBALS['DB_pass']);
+    $rs = new DataObj;
+    $rs->db_open($db_link, $GLOBALS['DB_name'],
+        "SELECT e.TotalDocComIva, e.enc_Pais, e.enc_Pais_ent, mp.Tipo FROM encomendas e " .
+        "INNER JOIN metodos_pagamento mp ON mp.ID=e.Metodo_pagamento WHERE e.ID='" . (int) $enc_id . "' LIMIT 1");
+    $eligible = !$rs->EOF() && (int) $rs->db_data['Tipo'] === (int) MP_TP_SEQURA &&
+        sequra_checkout_eligible($rs->db_data['TotalDocComIva'], $rs->db_data['enc_Pais'], $rs->db_data['enc_Pais_ent']);
+    $rs->db_close();
+    return $eligible;
+}
+
 function sequra_sandbox_order_access_allowed($enc_id)
 {
     $config = sequra_config();

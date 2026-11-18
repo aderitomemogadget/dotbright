@@ -8,6 +8,7 @@ $token = isset($_GET['token']) ? (string) $_GET['token'] : '';
 if (!sequra_is_ready()) { http_response_code(503); exit('Pagamento temporariamente indisponível.'); }
 if ($enc_id <= 0 || !sequra_valid_order_token($enc_id, $token)) { http_response_code(403); exit('Encomenda inválida.'); }
 if (!sequra_sandbox_order_access_allowed($enc_id)) { http_response_code(403); exit('Pagamento de teste não autorizado.'); }
+if (!sequra_order_eligible($enc_id)) { http_response_code(403); exit('A seQura requer uma encomenda de pelo menos 50 EUR e moradas de faturação e entrega em Portugal. Selecione outro método de pagamento.'); }
 $order_uri = isset($_SESSION['SEQURA_ORDER_URI_' . $enc_id]) ? $_SESSION['SEQURA_ORDER_URI_' . $enc_id] : '';
 if (!sequra_safe_order_uri($order_uri)) { http_response_code(409); exit('A sessão de pagamento expirou. Volte à encomenda e tente novamente.'); }
 $form_result = sequra_get_identification_form($order_uri);

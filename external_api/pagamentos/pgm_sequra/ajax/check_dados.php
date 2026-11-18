@@ -18,6 +18,7 @@ $token = isset($_GET['token']) ? (string) $_GET['token'] : '';
 if (!sequra_is_ready()) sequra_ajax_response(array('ok'=>false, 'error'=>'unavailable'), 503);
 if ($enc_id <= 0 || !sequra_valid_order_token($enc_id, $token)) sequra_ajax_response(array('ok'=>false, 'error'=>'invalid_order'), 403);
 if (!sequra_sandbox_order_access_allowed($enc_id)) sequra_ajax_response(array('ok'=>false, 'error'=>'forbidden'), 403);
+if (!sequra_order_eligible($enc_id)) sequra_ajax_response(array('ok'=>false, 'error'=>'ineligible_order'), 403);
 $payload = sequra_get_order_payload($enc_id);
 if (!$payload) sequra_ajax_response(array('ok'=>false, 'error'=>'order_not_found'), 404);
 $result = sequra_create_order($payload);

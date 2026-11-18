@@ -139,7 +139,7 @@ function showLayoutMetodosPagamento_admin($metodoPagamento)
         </div>
     </div><?php
 }
-function showLayoutMetodosPagamento($metodoPagamento)
+function showLayoutMetodosPagamento($metodoPagamento, $sequra_context = null)
 {
     global $m_metodoenvio; //Podem existir metodos de pagamento que não sejam para disponibilizar para todos os metodos de envio, exemplo, na loja
     $ponto_recolha_loja=0;
@@ -172,6 +172,14 @@ function showLayoutMetodosPagamento($metodoPagamento)
                     $img_ext=$rs->db_data['img_ext'];
                     $tipo=$rs->db_data['Tipo'];
 
+                    if (defined('MP_TP_SEQURA') && (int) $tipo === (int) MP_TP_SEQURA &&
+                        (!is_array($sequra_context) || !sequra_checkout_eligible(
+                            sequra_checkout_total($sequra_context, $rs->db_data),
+                            $sequra_context['billing_country'], $sequra_context['delivery_country'])))
+                    {
+                        $rs->db_next();
+                        continue;
+                    }
                     if($tipo != 20 || ($tipo==20 && $ponto_recolha_loja==1))
                     {
                     ?>
@@ -403,6 +411,11 @@ function getMetodoPagamentoSequraPayGateway($idMetodo, $totalEncomenda, $idEncom
     {
         sequra_log($idEncomenda, sequra_order_reference($idEncomenda), '', '', 'SANDBOX_FORBIDDEN', 'Encomenda fora do grupo de testes.');
         return show_alerta2('O pagamento seQura de testes não está disponível para esta encomenda. A encomenda ficou registada; selecione outra forma de pagamento ou contacte-nos.');
+    }
+
+    if (!sequra_order_eligible($idEncomenda))
+    {
+        return show_alerta2('A seQura requer uma encomenda de pelo menos 50 EUR e moradas de faturação e entrega em Portugal. Selecione outro método de pagamento.');
     }
 
     $payload = sequra_get_order_payload($idEncomenda);
