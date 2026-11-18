@@ -1,27 +1,155 @@
-//global variables
+// Product-page simulation only: no checkout/session/payment fields are written.
+(function (w, d) {
+    if (w.DotbrightSequraOptions) return;
+    function text(root, selector, value) {
+        var node = root.querySelector(selector);
+        if (node) node.textContent = value;
+    }
+    function money(cents) {
+        if (w.Intl && w.Intl.NumberFormat) return new w.Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+        return (cents / 100).toFixed(2).replace('.', ',') + ' €';
+    }
+    function value(field) {
+        return field && typeof field.value === 'number' && isFinite(field.value) && field.value >= 0 ? field.value : null;
+    }
+    function selection(root) {
+        var cash = root.querySelector('[data-db-payment-choice][value="cash"]');
+        var credit = root.querySelector('[data-db-payment-choice][value="sequra"]');
+        var selected = credit.checked && !credit.disabled;
+        if (!selected) { cash.checked = true; credit.checked = false; }
+        root.querySelector('.db-payment-card--cash').classList.toggle('is-selected', !selected);
+        root.querySelector('[data-db-sequra-card]').classList.toggle('is-selected', selected);
+        root.querySelector('[data-db-plan-details]').hidden = !selected;
+        credit.setAttribute('aria-expanded', String(selected));
+    }
+    function unavailable(root, message) {
+        root.querySelector('[data-db-payment-choice][value="sequra"]').disabled = true;
+        text(root, '[data-db-plan-description]', message);
+        text(root, '[data-db-monthly-price]', '—');
+        root.querySelector('[data-db-monthly-suffix]').hidden = true;
+        selection(root);
+    }
+    function choosePlan(root, plan) {
+        root._dbSequraCount = plan.count;
+        text(root, '[data-db-monthly-price]', money(plan.monthly));
+        root.querySelector('[data-db-monthly-suffix]').hidden = false;
+        var cost = plan.total - Number(root.getAttribute('data-amount'));
+        text(root, '[data-db-plan-total]', 'Total ' + money(plan.total) + (cost > 0 ? ', incluindo ' + money(cost) + ' de custos de financiamento.' : ', sem custos de financiamento.'));
+        var first = root.querySelector('[data-db-first-payment]');
+        first.hidden = plan.first === null || plan.first === plan.monthly;
+        first.textContent = first.hidden ? '' : 'Primeira prestação: ' + money(plan.first) + '. Restantes prestações: ' + money(plan.monthly) + '.';
+        var buttons = root.querySelectorAll('[data-db-plan-count]');
+        for (var i = 0; i < buttons.length; i++) buttons[i].setAttribute('aria-pressed', String(Number(buttons[i].getAttribute('data-db-plan-count')) === plan.count));
+    }
+    function agreements(root, result, amount) {
+        var product = root.getAttribute('data-product');
+        var offered = result && result[product];
+        var plans = [], counts = {};
+        if (Array.isArray(offered)) offered.forEach(function (agreement) {
+            var count = Number(agreement.instalment_count);
+            var monthly = value(agreement.instalment_total), total = value(agreement.grand_total);
+            var minimum = value(agreement.min_amount), maximum = value(agreement.max_amount);
+            if (agreement.available !== true || !isFinite(count) || count < 2 || Math.floor(count) !== count ||
+                monthly === null || monthly <= 0 || total === null || total < amount || counts[count] ||
+                (minimum !== null && amount < minimum) || (maximum !== null && amount > maximum)) return;
+            counts[count] = true;
+            plans.push({ count: count, monthly: monthly, total: total, first: value(agreement.down_payment_total) });
+        });
+        plans.sort(function (a, b) { return a.count - b.count; });
+        if (!plans.length) { unavailable(root, 'Sem planos disponíveis para este valor'); return; }
+        var container = root.querySelector('[data-db-plans]');
+        container.textContent = '';
+        plans.forEach(function (plan) {
+            var button = d.createElement('button'), title = d.createElement('strong'), price = d.createElement('span');
+            button.type = 'button'; button.className = 'db-payment-plan';
+            button.setAttribute('data-db-plan-count', String(plan.count));
+            button.setAttribute('aria-pressed', 'false');
+            button.setAttribute('aria-label', plan.count + ' prestações de ' + money(plan.monthly));
+            title.textContent = plan.count + 'x'; price.textContent = money(plan.monthly);
+            button.appendChild(title); button.appendChild(price);
+            button.addEventListener('click', function () { choosePlan(root, plan); });
+            container.appendChild(button);
+        });
+        var terms = plans.map(function (plan) { return plan.count; });
+        var description = terms.length === 1 ? String(terms[0]) : terms.slice(0, -1).join(', ') + ' ou ' + terms[terms.length - 1];
+        text(root, '[data-db-plan-description]', 'Em ' + description + ' meses');
+        root.querySelector('[data-db-payment-choice][value="sequra"]').disabled = false;
+        var selected = plans.filter(function (plan) { return plan.count === root._dbSequraCount; })[0] || plans[plans.length - 1];
+        choosePlan(root, selected);
+        selection(root);
+    }
+    function loadPlans(root) {
+        var amount = Number(root.getAttribute('data-amount'));
+        root.querySelector('[data-db-first-payment]').hidden = true;
+        root.querySelector('[data-db-sequra-card]').hidden = amount < 5000;
+        if (amount < 5000) { unavailable(root, 'Disponível a partir de 50 €'); return; }
+        var request = (root._dbSequraRequest || 0) + 1;
+        root._dbSequraRequest = request;
+        text(root, '[data-db-plan-description]', 'A calcular as opções disponíveis…');
+        if (!w.Sequra || typeof w.Sequra.computeCreditAgreements !== 'function') {
+            root._dbSequraWaiting = w.setTimeout(function () {
+                if (request === root._dbSequraRequest) unavailable(root, 'Simulação temporariamente indisponível');
+            }, 12000);
+            return;
+        }
+        w.clearTimeout(root._dbSequraWaiting);
+        function current() { return request === root._dbSequraRequest && amount === Number(root.getAttribute('data-amount')); }
+        function accept(result) { if (current()) agreements(root, result, amount); }
+        function reject() { if (current()) unavailable(root, 'Simulação temporariamente indisponível'); }
+        // Official seQura quotes provide both monthly and grand totals, including fees.
+        try {
+            var result = w.Sequra.computeCreditAgreements({ amount: String(amount), product: root.getAttribute('data-product') });
+            if (result && typeof result.then === 'function') result.then(accept, reject);
+            else accept(result);
+        } catch (error) { reject(); }
+    }
+    function init() {
+        var roots = d.querySelectorAll('.db-payment-options');
+        for (var i = 0; i < roots.length; i++) if (!roots[i]._dbSequraInitialized) {
+            roots[i]._dbSequraInitialized = true;
+            selection(roots[i]);
+            loadPlans(roots[i]);
+        }
+    }
+    function updatePrice(price) {
+        if (typeof price !== 'number' || !isFinite(price) || price < 0) return;
+        var amount = Math.round(price * 100), roots = d.querySelectorAll('.db-payment-options');
+        for (var i = 0; i < roots.length; i++) {
+            var root = roots[i];
+            if (Number(root.getAttribute('data-amount')) === amount) continue;
+            root.setAttribute('data-amount', String(amount));
+            text(root, '[data-db-cash-price]', money(amount));
+            root.querySelector('.sequra-educational-popup').setAttribute('data-amount', String(amount));
+            // Never display a quote calculated for the previous variant's price.
+            text(root, '[data-db-monthly-price]', '—');
+            text(root, '[data-db-plan-total]', 'A atualizar a simulação…');
+            root.querySelector('[data-db-plans]').textContent = '';
+            loadPlans(root);
+        }
+        if (w.Sequra && typeof w.Sequra.refreshComponents === 'function') {
+            try { w.Sequra.refreshComponents(); } catch (error) { /* The product purchase flow remains independent. */ }
+        }
+    }
+    d.addEventListener('change', function (event) {
+        if (!event.target.matches || !event.target.matches('[data-db-payment-choice]')) return;
+        var root = event.target.closest('.db-payment-options');
+        if (root) selection(root);
+    });
+    function ready() {
+        init();
+        if (w.Sequra && typeof w.Sequra.onLoad === 'function') w.Sequra.onLoad(function () {
+            var roots = d.querySelectorAll('.db-payment-options');
+            for (var i = 0; i < roots.length; i++) loadPlans(roots[i]);
+        });
+    }
+    w.DotbrightSequraOptions = { init: init, updatePrice: updatePrice };
+    if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', ready);
+    else ready();
+})(window, document);
+
 function updateSequraProductWidgets(price)
 {
-    var widgets = document.querySelectorAll('.db-sequra-product-widget');
-    if (!widgets.length || typeof price !== 'number' || !isFinite(price)) return;
-    var amount = Math.round(price * 100);
-    var changed = false;
-    for (var i = 0; i < widgets.length; i++) {
-        var promotion = widgets[i].querySelector('.sequra-promotion-widget');
-        if (!promotion) continue;
-        widgets[i].hidden = amount < 5000;
-        if (promotion.getAttribute('data-amount') !== String(amount)) {
-            promotion.setAttribute('data-amount', String(amount));
-            changed = true;
-        }
-    }
-    if (!changed || !window.Sequra) return;
-    function refresh() {
-        if (window.Sequra && typeof window.Sequra.refreshComponents === 'function') {
-            try { window.Sequra.refreshComponents(); } catch (error) { /* Keep the existing product flow working if the promotional service fails. */ }
-        }
-    }
-    if (typeof window.Sequra.refreshComponents === 'function') refresh();
-    else if (typeof window.Sequra.onLoad === 'function') window.Sequra.onLoad(refresh);
+    if (window.DotbrightSequraOptions) window.DotbrightSequraOptions.updatePrice(price);
 }
 
 var selectedCombination=[];

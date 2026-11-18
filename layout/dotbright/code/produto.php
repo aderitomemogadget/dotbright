@@ -1218,9 +1218,37 @@ function sequra_product_widget($prods, $display_price = null)
     $config = $GLOBALS['sequra_product_widget_config'];
     $amount = (int) round((float) $display_price * 100);
     $product = htmlspecialchars($config['products'][0], ENT_QUOTES, 'UTF-8');
-    return '<div class="db-sequra-product-widget" style="clear:both;width:100%;max-width:100%" data-sequra-product-id="' . (int) $prods['prod_id'] . '"' .
-        ($amount < 5000 ? ' hidden' : '') . '><div class="sequra-promotion-widget" style="min-height:80px;width:100%;max-width:100%" data-amount="' . $amount .
-        '" data-product="' . $product . '" data-alignment="left" data-size="M"></div></div>';
+    static $instance = 0;
+    $instance++;
+    $id = 'db-payment-preview-' . (int) $prods['prod_id'] . '-' . $instance;
+    $css_path = __DIR__ . '/../css/css_external/sequra-product-options.css';
+    $css_url = SITE_HTTP_URL . 'layout/' . PROJETO . '/css/css_external/sequra-product-options.css?v=' . filemtime($css_path);
+    $html = $instance === 1 ? '<link rel="stylesheet" href="' . htmlspecialchars($css_url, ENT_QUOTES, 'UTF-8') . '">' : '';
+    $html .= '<fieldset class="db-sequra-product-widget db-payment-options" data-sequra-product-id="' . (int) $prods['prod_id'] .
+        '" data-amount="' . $amount . '" data-product="' . $product . '">' .
+        '<legend class="db-payment-options__legend">Opções de pagamento</legend>' .
+        '<label class="db-payment-card db-payment-card--cash is-selected">' .
+            '<input type="radio" name="' . $id . '" value="cash" data-db-payment-choice checked>' .
+            '<span class="db-payment-card__description"><strong>Pronto pagamento</strong><small>Pagamento integral</small></span>' .
+            '<strong class="db-payment-card__price" data-db-cash-price>' . number_format((float) $display_price, 2, ',', ' ') . ' €</strong>' .
+        '</label>' .
+        '<div class="db-payment-card db-payment-card--sequra" data-db-sequra-card' . ($amount < 5000 ? ' hidden' : '') . '>' .
+            '<label class="db-payment-card__header">' .
+                '<input type="radio" name="' . $id . '" value="sequra" data-db-payment-choice aria-controls="' . $id . '-details" aria-expanded="false" disabled>' .
+                '<span class="db-payment-card__description"><strong>Prestações seQura</strong><small data-db-plan-description>A calcular as opções disponíveis…</small></span>' .
+                '<span class="db-payment-card__price"><strong data-db-monthly-price>—</strong><small data-db-monthly-suffix hidden>/mês</small></span>' .
+            '</label>' .
+            '<div class="db-payment-card__details" id="' . $id . '-details" data-db-plan-details hidden>' .
+                '<div class="db-payment-plans" data-db-plans role="group" aria-label="Simular número de prestações"></div>' .
+                '<p class="db-payment-card__total" data-db-plan-total aria-live="polite"></p>' .
+                '<p class="db-payment-card__first" data-db-first-payment hidden></p>' .
+                '<p class="db-payment-card__note">Portes à parte. Sujeito a aprovação.</p>' .
+                '<button type="button" class="sequra-educational-popup db-payment-card__conditions" data-product="' . $product . '" data-amount="' . $amount . '">Informação das prestações</button>' .
+            '</div>' .
+        '</div>' .
+        '<p class="db-payment-options__notice">Simulação. O método de pagamento é escolhido no checkout.</p>' .
+    '</fieldset>';
+    return $html;
 }
 
 function ficha_produto($prods)

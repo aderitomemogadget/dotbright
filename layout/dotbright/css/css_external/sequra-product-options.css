@@ -1,0 +1,104 @@
+.db-payment-options {
+  --db-payment-accent: #343cff;
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  margin: 20px 0 22px;
+  padding: 0;
+  border: 0;
+  color: #111;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.db-payment-options *, .db-payment-options *::before, .db-payment-options *::after {
+  box-sizing: border-box;
+}
+.db-payment-options [hidden] { display: none !important; }
+.db-payment-options .db-payment-options__legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.db-payment-options .db-payment-card {
+  display: block;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 1px solid #dce0f2;
+  border-radius: 14px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: normal;
+  transition: border-color .15s, background-color .15s, box-shadow .15s;
+}
+.db-payment-options .db-payment-card.is-selected {
+  border-color: var(--db-payment-accent);
+  box-shadow: inset 0 0 0 1px var(--db-payment-accent);
+  background: #fafaff;
+}
+.db-payment-options .db-payment-card--cash,
+.db-payment-options .db-payment-card__header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 66px;
+  padding: 13px 16px;
+  cursor: pointer;
+}
+.db-payment-options .db-payment-card__header { margin: 0; font-weight: normal; }
+.db-payment-options input[data-db-payment-choice] {
+  position: static;
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  padding: 0;
+  appearance: auto;
+  -webkit-appearance: radio;
+  accent-color: var(--db-payment-accent);
+  cursor: pointer;
+}
+.db-payment-options .db-payment-card__description { flex: 1 1 auto; min-width: 0; }
+.db-payment-options .db-payment-card__description strong { display: block; font-size: 15px; line-height: 1.3; }
+.db-payment-options .db-payment-card__description small { display: block; color: #4b5d7a; font-size: 13px; line-height: 1.35; }
+.db-payment-options .db-payment-card__price { flex: 0 0 auto; margin-left: auto; text-align: right; white-space: nowrap; font-size: 15px; }
+.db-payment-options .db-payment-card__price small { font-size: 12px; font-weight: normal; }
+.db-payment-options .db-payment-card__details { padding: 0 18px 16px 48px; }
+.db-payment-options .db-payment-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 7px; margin: 2px 0 12px; }
+.db-payment-options .db-payment-plan {
+  display: block;
+  width: 100%;
+  min-height: 49px;
+  padding: 7px 5px;
+  border: 1px solid #dce0f2;
+  border-radius: 9px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.db-payment-options .db-payment-plan strong { display: block; font-size: 14px; line-height: 1.25; }
+.db-payment-options .db-payment-plan span { display: block; color: #4b5d7a; font-size: 12px; line-height: 1.4; white-space: nowrap; }
+.db-payment-options .db-payment-plan[aria-pressed="true"] { border-color: var(--db-payment-accent); box-shadow: inset 0 0 0 1px var(--db-payment-accent); background: #e5e8ff; }
+.db-payment-options .db-payment-card__total,
+.db-payment-options .db-payment-card__first,
+.db-payment-options .db-payment-card__note { margin: 4px 0; color: #4b5d7a; font-size: 13px; line-height: 1.5; }
+.db-payment-options .db-payment-options__notice { margin: 7px 1px 0; color: #637087; font-size: 11px; line-height: 1.4; }
+.db-payment-options .db-payment-card__conditions { display: inline; margin: 4px 0 0; padding: 0; border: 0; background: none; color: #435581; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.db-payment-options .db-payment-card:focus-within { outline: 2px solid #a7acff; outline-offset: 3px; }
+.db-payment-options .db-payment-plan:focus-visible,
+.db-payment-options .db-payment-card__conditions:focus-visible { outline: 2px solid var(--db-payment-accent); outline-offset: 3px; }
+@media (max-width: 479px) {
+  .db-payment-options .db-payment-card--cash, .db-payment-options .db-payment-card__header { gap: 9px; padding: 12px; }
+  .db-payment-options .db-payment-card__description strong { font-size: 14px; }
+  .db-payment-options .db-payment-card__description small { font-size: 12px; }
+  .db-payment-options .db-payment-card__price { font-size: 14px; }
+  .db-payment-options .db-payment-card__details { padding: 0 12px 14px; }
+  .db-payment-options .db-payment-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
