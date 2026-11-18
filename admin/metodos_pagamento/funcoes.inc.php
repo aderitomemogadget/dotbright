@@ -86,6 +86,36 @@ function show_page_bottom_tools()
 	<br />
 <?php
 }
+function sequra_admin_test_fields($type, $db_link)
+{
+    $fields = array('columns'=>'', 'values'=>'', 'assignments'=>'');
+    if (!defined('MP_TP_SEQURA') || (int) $type !== (int) MP_TP_SEQURA) return $fields;
+    if (isset($_POST['Sequra_Modo_Teste']) && (!is_scalar($_POST['Sequra_Modo_Teste']) ||
+        !in_array((string) $_POST['Sequra_Modo_Teste'], array('0', '1'), true))) {
+        echo 'seQura: modo teste inválido.';
+        return false;
+    }
+    $mode = isset($_POST['Sequra_Modo_Teste']) && (string) $_POST['Sequra_Modo_Teste'] === '1' ? 1 : 0;
+    $raw_client = isset($_POST['Sequra_Cliente_Teste']) ? $_POST['Sequra_Cliente_Teste'] : '';
+    $client_id = $raw_client === '' ? 0 : filter_var($raw_client, FILTER_VALIDATE_INT,
+        array('options'=>array('min_range'=>1, 'max_range'=>2147483647)));
+    if ($client_id === false || ($mode && $client_id <= 0)) {
+        echo 'seQura: indique um ID de cliente válido para o modo teste.';
+        return false;
+    }
+    if ($client_id > 0) {
+        $rs = new DataObj;
+        $rs->db_open($db_link, $GLOBALS['DB_name'], "SELECT ID FROM clientes WHERE ID='" . (int) $client_id . "' LIMIT 1");
+        $exists = !$rs->EOF();
+        $rs->db_close();
+        if (!$exists) { echo 'seQura: o ID de cliente indicado não existe.'; return false; }
+    }
+    $fields['columns'] = ',Sequra_Modo_Teste,Sequra_Cliente_Teste';
+    $fields['values'] = ",'" . $mode . "','" . (int) $client_id . "'";
+    $fields['assignments'] = ",Sequra_Modo_Teste='" . $mode . "',Sequra_Cliente_Teste='" . (int) $client_id . "'";
+    return $fields;
+}
+
 function InsertNewRecord()
 {
 	global $DB_host,$DB_user,$DB_pass,$DB_name,$admin_lang;
@@ -98,6 +128,8 @@ function InsertNewRecord()
 	$img_path="../../files/metodos_pagamento/";
 
 	$tipo_metodo 	= $_POST["tipo_metodo"];
+	$sequra_test_fields = sequra_admin_test_fields($tipo_metodo, $db_link);
+	if ($sequra_test_fields === false) { db_closedb_conection($db_link); return false; }
 	$metodo_taxa	= $_POST["metodo_taxa"];
 	$tem_foto1 		= $_POST['tem_foto1'];
 	$Apagar_img1 	= $_POST['Apagar_img1'];
@@ -181,8 +213,9 @@ function InsertNewRecord()
 	if(isset($_POST['Visivel'])) $Visivel = $_POST['Visivel'];
 	else $Visivel = 0;
 
-	$sql = "INSERT INTO metodos_pagamento(Ordem,metodo_taxa_tipo,limite,Visivel,img_ext,Tipo,Sandbox,Username,Username_sandbox,Password,Password_sandbox,Taxa,chavebo,entidade,subentidade,nib,swift,iban,Contractnumber,Account_id,Account_id_sandbox,Merchant_site_id,Merchant_site_id_sandbox,ep_account_id_sandbox,ep_api_key_sandbox,ep_user_sandbox,ep_cin_sandbox,ep_entity_sandbox,ep_url_sandbox,ep_account_id_production,ep_api_key_production,ep_user_production,ep_cin_production,ep_entity_production,ep_url_production,ep_sandbox_production,Abreviatura)
+	$sql = "INSERT INTO metodos_pagamento(Ordem,metodo_taxa_tipo,limite,Visivel,img_ext,Tipo,Sandbox,Username,Username_sandbox,Password,Password_sandbox,Taxa,chavebo,entidade,subentidade,nib,swift,iban,Contractnumber,Account_id,Account_id_sandbox,Merchant_site_id,Merchant_site_id_sandbox,ep_account_id_sandbox,ep_api_key_sandbox,ep_user_sandbox,ep_cin_sandbox,ep_entity_sandbox,ep_url_sandbox,ep_account_id_production,ep_api_key_production,ep_user_production,ep_cin_production,ep_entity_production,ep_url_production,ep_sandbox_production,Abreviatura" . $sequra_test_fields['columns'] . ")
 	VALUES ('$Ordem','$metodo_taxa_tipo','$metodo_limite', '$Visivel','$img_ext','$tipo_metodo','$sandbox','$user','$user_sand','$pass','$pass_sand','$metodo_taxa','$metodo_chave','$metodo_entidade','$metodo_subentidade','$metodo_nib','$metodo_swift','$metodo_iban','$metodo_contractnumber','$metodo_account_id','$metodo_account_id_sandbox','$metodo_merchant_site_id','$metodo_merchant_site_id_sandbox','$ep_account_id_sandbox','$ep_api_key_sandbox','$ep_user_sandbox','$ep_cin_sandbox','$ep_entity_sandbox','$ep_url_sandbox','$ep_account_id_production','$ep_api_key_production','$ep_user_production','$ep_cin_production','$ep_entity_production','$ep_url_production','$ep_sandbox_production','$Abreviatura')";
+	if ($sequra_test_fields['values'] !== '') $sql = substr($sql, 0, -1) . $sequra_test_fields['values'] . ')';
 	// echo $sql.'<br>';
 	$res = Runquery($db_link,$DB_name,$sql);
 	if($res){
@@ -229,6 +262,8 @@ function ChangeRecord()
 	$img_path="../../files/metodos_pagamento/";
 
 	$tipo_metodo = $_POST["tipo_metodo"];
+	$sequra_test_fields = sequra_admin_test_fields($tipo_metodo, $db_link);
+	if ($sequra_test_fields === false) { db_closedb_conection($db_link); return false; }
 	$id_metodo = $_GET["id_metodo"];
 	$metodo_taxa = $_POST["metodo_taxa"];
 	$tem_foto1 = $_POST['tem_foto1'];
@@ -343,10 +378,11 @@ function ChangeRecord()
 			ep_entity_production = '$ep_entity_production',
 			ep_url_production = '$ep_url_production',
 			ep_sandbox_production = '$ep_sandbox_production',
-			Abreviatura='$Abreviatura'
+			Abreviatura='$Abreviatura'" . $sequra_test_fields['assignments'] . "
 			where ID=$id_metodo";
 
 		$res = Runquery($db_link,$DB_name,$sql);
+		if ($sequra_test_fields['columns'] !== '' && !$res) { db_closedb_conection($db_link); return false; }
 
 		$dados_tab = verificaExisteLingua("metodos_pagamento_lang",$m_lang,$id_metodo);
 		if($dados_tab->EOF()) $sql = "INSERT INTO metodos_pagamento_lang(ID_PAI,Cabecalho,Texto1,Lang) VALUES ('$id_metodo','".$nome."','".$metodo_descricao."','$m_lang')";

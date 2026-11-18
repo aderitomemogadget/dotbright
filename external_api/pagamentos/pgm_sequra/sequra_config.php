@@ -61,19 +61,48 @@ function sequra_is_ready()
     return count(sequra_config_errors(true)) === 0;
 }
 
-function sequra_sandbox_access_allowed()
+function sequra_current_client_id()
 {
-    $config = sequra_config();
-    if (!$config['sandbox']) return true;
+    if (!function_exists('cliente_logado')) return 0;
+    $customer = cliente_logado();
+    return is_array($customer) && isset($customer['cli_id']) ? (int) $customer['cli_id'] : 0;
+}
 
-    $client_id = isset($GLOBALS['cli_id']) ? (int) $GLOBALS['cli_id'] : 0;
-    if ($client_id <= 0 && session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['ss_cli_id'])) {
-        $client_id = (int) $_SESSION['ss_cli_id'];
+function sequra_payment_method($method_id = 0)
+{
+    if (!defined('MP_TP_SEQURA')) return false;
+    $db_link = db_opendb_conection($GLOBALS['DB_host'], $GLOBALS['DB_user'], $GLOBALS['DB_pass']);
+    $rs = new DataObj;
+    $sql = "SELECT * FROM metodos_pagamento WHERE Tipo='" . (int) MP_TP_SEQURA . "'";
+    $sql .= (int) $method_id > 0 ? " AND ID='" . (int) $method_id . "'" : " AND Visivel='1'";
+    $rs->db_open($db_link, $GLOBALS['DB_name'], $sql . ' ORDER BY ID ASC LIMIT 1');
+    $method = $rs->EOF() ? false : $rs->db_data;
+    $rs->db_close();
+    return $method;
+}
+
+function sequra_method_access_allowed($method)
+{
+    if (!defined('MP_TP_SEQURA') || !is_array($method) || !isset($method['Tipo'], $method['Visivel']) ||
+        (int) $method['Tipo'] !== (int) MP_TP_SEQURA || (int) $method['Visivel'] !== 1 ||
+        !isset($method['Sequra_Modo_Teste'], $method['Sequra_Cliente_Teste'])) return false;
+
+    $client_id = sequra_current_client_id();
+    if ((int) $method['Sequra_Modo_Teste'] === 1) {
+        return $client_id > 0 && (int) $method['Sequra_Cliente_Teste'] > 0 &&
+            $client_id === (int) $method['Sequra_Cliente_Teste'];
     }
+    if ((int) $method['Sequra_Modo_Teste'] !== 0) return false;
+    // Keep the existing sandbox protection when no specific test customer is configured.
+    if (!sequra_config()['sandbox']) return true;
     if ($client_id <= 0 || !function_exists('cliente_perfil')) return false;
-
     $profile = cliente_perfil($client_id);
     return is_array($profile) && isset($profile['Testes']) && (int) $profile['Testes'] === 1;
+}
+
+function sequra_sandbox_access_allowed()
+{
+    return sequra_method_access_allowed(sequra_payment_method());
 }
 
 function sequra_widget_config()

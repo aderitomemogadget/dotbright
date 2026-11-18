@@ -50,9 +50,6 @@ function sequra_order_eligible($enc_id)
 
 function sequra_sandbox_order_access_allowed($enc_id)
 {
-    $config = sequra_config();
-    if (!$config['sandbox']) return true;
-
     $enc_id = (int) $enc_id;
     if ($enc_id <= 0) return false;
 
@@ -61,11 +58,19 @@ function sequra_sandbox_order_access_allowed($enc_id)
     $rs->db_open(
         $db_link,
         $GLOBALS['DB_name'],
-        "SELECT c.Testes FROM encomendas e INNER JOIN clientes c ON c.ID=e.ID_Cliente WHERE e.ID='" . $enc_id . "' LIMIT 1"
+        "SELECT ID_Cliente, Metodo_pagamento FROM encomendas WHERE ID='" . $enc_id . "' LIMIT 1"
     );
-    $allowed = !$rs->EOF() && isset($rs->db_data['Testes']) && (int) $rs->db_data['Testes'] === 1;
+    $order = $rs->EOF() ? false : $rs->db_data;
     $rs->db_close();
-    return $allowed;
+    if (!$order) return false;
+    $method = sequra_payment_method($order['Metodo_pagamento']);
+    if (!sequra_method_access_allowed($method)) return false;
+    if ((int) $method['Sequra_Modo_Teste'] === 1) {
+        return (int) $order['ID_Cliente'] === (int) $method['Sequra_Cliente_Teste'];
+    }
+    if (!sequra_config()['sandbox']) return true;
+    $profile = cliente_perfil((int) $order['ID_Cliente']);
+    return is_array($profile) && isset($profile['Testes']) && (int) $profile['Testes'] === 1;
 }
 
 function sequra_verify_signature($raw_body)

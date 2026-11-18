@@ -33,6 +33,8 @@
 
 
 	global $DB_host,$DB_user,$DB_pass,$DB_name,$admin_lang;
+	$sequra_modo_teste = 0;
+	$sequra_cliente_teste = 0;
 	if($id_metodo != 0)
 	{
 		$db_link=db_opendb_conection($DB_host,$DB_user,$DB_pass);
@@ -52,6 +54,8 @@
 			$metodo_password_sandbox	= $rs->db_data['Password_sandbox'];
 			$metodo_taxa 				= $rs->db_data['Taxa'];
 			$tipo 						= $rs->db_data['Tipo'];
+			$sequra_modo_teste = isset($rs->db_data['Sequra_Modo_Teste']) ? (int) $rs->db_data['Sequra_Modo_Teste'] : 0;
+			$sequra_cliente_teste = isset($rs->db_data['Sequra_Cliente_Teste']) ? (int) $rs->db_data['Sequra_Cliente_Teste'] : 0;
 			$metodo_limite 				= $rs->db_data['limite'];
 			$metodo_taxa_tipo 			= $rs->db_data['metodo_taxa_tipo'];
 			$Abreviatura				= $rs->db_data['Abreviatura'];
@@ -123,6 +127,32 @@
 		<td width="5" height="26">&nbsp; </td>
 		</tr>
 		</table>
+
+        <?php if (defined('MP_TP_SEQURA')) { ?>
+        <table id="sequra-test-settings" width="100%" cellpadding="5" cellspacing="0" border="0" style="background:#FFF;margin-bottom:5px;<?php if ((int) $tipo !== (int) MP_TP_SEQURA) echo 'display:none'; ?>">
+            <tr>
+                <td width="200"><label for="Sequra_Modo_Teste">seQura — Modo teste</label></td>
+                <td><input type="checkbox" name="Sequra_Modo_Teste" id="Sequra_Modo_Teste" value="1" <?php if ($sequra_modo_teste === 1) echo 'checked="checked"'; ?>></td>
+            </tr>
+            <tr>
+                <td><label for="Sequra_Cliente_Teste">ID cliente de teste</label></td>
+                <td><input type="number" name="Sequra_Cliente_Teste" id="Sequra_Cliente_Teste" min="1" max="2147483647" step="1" value="<?php echo $sequra_cliente_teste > 0 ? $sequra_cliente_teste : ''; ?>" class="box"></td>
+            </tr>
+            <tr><td colspan="2">Com o modo teste ativo, apenas este cliente autenticado pode ver e iniciar pagamentos seQura. O método deve estar marcado como Visível. Esta opção não altera o ambiente sandbox/produção configurado na integração.</td></tr>
+        </table>
+        <script>
+        $(function () {
+            function updateSequraTestSettings() {
+                var isSequra = Number($('#tipo_metodo').val()) === <?php echo (int) MP_TP_SEQURA; ?>;
+                $('#sequra-test-settings').toggle(isSequra);
+                $('#Sequra_Modo_Teste, #Sequra_Cliente_Teste').prop('disabled', !isSequra);
+                $('#Sequra_Cliente_Teste').prop('required', isSequra && $('#Sequra_Modo_Teste').is(':checked'));
+            }
+            $('#tipo_metodo, #Sequra_Modo_Teste').on('change', updateSequraTestSettings);
+            updateSequraTestSettings();
+        });
+        </script>
+        <?php } ?>
 
 		<table width="100%" cellpadding=0 cellspacing=0 border=0 style="background:#FFF;margin-bottom:5px">
 		<tr><td colspan="10" height="10">&nbsp; </td></tr>
