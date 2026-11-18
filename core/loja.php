@@ -2287,6 +2287,12 @@ function carrinho_purchase()
 
 				$ip=getenv("REMOTE_ADDR");
 				$sql="UPDATE encomendas SET TotalDocIva='{$totalEncomenda['TOTALIVA']}',TotalIva='{$totalEncomenda['TOTALIVA']}',TotalDocComIva='$tot',TotalDocSemIva='{$totalEncomenda['TOTALSIVA']}',ValorDesconto='{$totalEncomenda['DESCONTOS']}',Taxas='$taxas',enc_token='$enc_token',Promos_ID='$Promos_ID',Portes='$PortesCarrinho',PortesSemIva='$PortesSemIva',IvaPortes='23',Custos_logisticos='$total_custos_logisticos',IP='$ip'";
+				if(defined('MP_TP_SEQURA') && (int) getNomeMetodoPagamentoByTipo_ID($m_metodopagamento) === (int) MP_TP_SEQURA)
+				{
+					$sequra_client_ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+					$sequra_client_agent = isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+					$sql .= ",Sequra_IP=X'" . bin2hex($sequra_client_ip) . "',Sequra_User_Agent=X'" . bin2hex($sequra_client_agent) . "'";
+				}
 				if($data_limite != '')
 				{
 					$sql .= ",Data_Limite='$data_limite' ";

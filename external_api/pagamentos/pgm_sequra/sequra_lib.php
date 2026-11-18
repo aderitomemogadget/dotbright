@@ -145,6 +145,38 @@ function sequra_api_request($method, $url, $payload = null, $accept = 'applicati
         'response'=>json_decode((string) $response, true), 'headers'=>$headers_raw, 'location'=>sequra_get_http_header($headers_raw, 'Location'));
 }
 
+function sequra_customer_context($enc_id, $order, $allow_capture = false)
+{
+    // Missing columns must be installed before using this version of the integration.
+    if (!array_key_exists('Sequra_IP', $order) || !array_key_exists('Sequra_User_Agent', $order)) return false;
+
+    if ($order['Sequra_IP'] === null && $order['Sequra_User_Agent'] === null && $allow_capture) {
+        // Capture only on the initial browser request, never while handling an IPN.
+        // An existing provider order must retain its original customer context.
+        if (isset($_SESSION['SEQURA_ORDER_URI_' . (int) $enc_id])) return false;
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $agent = isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+        if (!filter_var($ip, FILTER_VALIDATE_IP) || $agent === '') return false;
+
+        $db_link = db_opendb_conection($GLOBALS['DB_host'], $GLOBALS['DB_user'], $GLOBALS['DB_pass']);
+        // Hex literals preserve the original header, including quotes, without SQL interpolation.
+        $sql = "UPDATE encomendas SET Sequra_IP=X'" . bin2hex($ip) . "', Sequra_User_Agent=X'" . bin2hex($agent) .
+            "' WHERE ID='" . (int) $enc_id . "' AND Sequra_IP IS NULL AND Sequra_User_Agent IS NULL";
+        if (!Runquery($db_link, $GLOBALS['DB_name'], $sql)) return false;
+        // Read back the persisted values so concurrent initial requests use the same pair.
+        $rs = new DataObj;
+        $rs->db_open($db_link, $GLOBALS['DB_name'], "SELECT Sequra_IP, Sequra_User_Agent FROM encomendas WHERE ID='" . (int) $enc_id . "'");
+        if ($rs->EOF()) { $rs->db_close(); return false; }
+        $order = $rs->db_data;
+        $rs->db_close();
+    }
+
+    $ip = (string) $order['Sequra_IP'];
+    $agent = (string) $order['Sequra_User_Agent'];
+    if (!filter_var($ip, FILTER_VALIDATE_IP) || $agent === '') return false;
+    return array('ip_number'=>$ip, 'user_agent'=>$agent);
+}
+
 function sequra_get_order_payload($enc_id, $state = '')
 {
     $enc_id = (int) $enc_id;
@@ -155,6 +187,12 @@ function sequra_get_order_payload($enc_id, $state = '')
     $order_rs->db_open($db_link, $GLOBALS['DB_name'], "SELECT * FROM encomendas WHERE ID='" . $enc_id . "'");
     if ($order_rs->EOF()) { $order_rs->db_close(); return false; }
     $order = $order_rs->db_data;
+    $context = sequra_customer_context($enc_id, $order, $state === '');
+    if ($context === false) {
+        $order_rs->db_close();
+        sequra_log($enc_id, sequra_order_reference($enc_id), '', '', 'CUSTOMER_CONTEXT_MISSING', 'IP ou navegador original indisponivel; verificar migracao e contexto da encomenda.');
+        return false;
+    }
     $reference = sequra_order_reference($enc_id);
     $items = array();
     $item_rs->db_open($db_link, $GLOBALS['DB_name'], 'SELECT * FROM encomendas_produtos WHERE ID_PAI=' . $enc_id . ' ORDER BY ID ASC');
@@ -200,8 +238,8 @@ function sequra_get_order_payload($enc_id, $state = '')
             'gift'=>false, 'items'=>$items, 'order_total_without_tax'=>$total_without, 'order_total_with_tax'=>$total_with),
         'delivery_address'=>$address, 'invoice_address'=>$address,
         'customer'=>array('given_names'=>$first_name, 'surnames'=>$last_name, 'title'=>'Mr', 'email'=>$order['enc_Email'],
-            'logged_in'=>((int) $order['ID_Cliente'] > 0), 'language_code'=>'pt', 'ip_number'=>isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '',
-            'user_agent'=>isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '', 'previous_orders'=>array(), 'nin'=>$nif, 'vat_number'=>$nif),
+            'logged_in'=>((int) $order['ID_Cliente'] > 0), 'language_code'=>'pt', 'ip_number'=>$context['ip_number'],
+            'user_agent'=>$context['user_agent'], 'previous_orders'=>array(), 'nin'=>$nif, 'vat_number'=>$nif),
         'gui'=>array('layout'=>'desktop'),
         'platform'=>array('name'=>'Dotbright', 'version'=>'1.0.0', 'plugin_version'=>'1.0.0', 'php_version'=>phpversion(), 'php_os'=>PHP_OS,
             'uname'=>php_uname(), 'db_name'=>'mysql', 'db_version'=>'0.0.0'),
