@@ -117,17 +117,29 @@ function db_disc_has_physical_image($id,$images) {
     }
     return false;
 }
-function db_disc_ids($kind) {
-    static $memo=array(); if(isset($memo[$kind]))return $memo[$kind];
+function db_disc_ids($kind,$unique=false) {
+    static $memo=array();
     $lang=addslashes($GLOBALS['site_lang']); $kind=$kind==='destaques'?'destaques':'novidades';
+    $memoKey=$kind.($unique?':unique':'');
+    if(isset($memo[$memoKey]))return $memo[$memoKey];
     $filter=$kind==='destaques'?' AND po.obj_destaque=1':'';
-    $rows=db_disc_rows("SELECT p.ID,p.Data_criacao,GROUP_CONCAT(DISTINCT CONCAT(pi.Ordem,':',pi.img_ext) ORDER BY pi.Ordem SEPARATOR ',') Images FROM products p INNER JOIN products_lang pl ON pl.ID_PAI=p.ID LEFT JOIN products_images pi ON pi.ID_ORG=p.ID WHERE p.Aproved=1 AND pl.Lang='$lang' AND EXISTS (SELECT 1 FROM products_objs po WHERE po.obj_type_id=p.ID AND (po.obj_val2=0 OR po.obj_val2 IS NULL) AND po.obj_stock>0 AND po.obj_pvp>0 $filter) AND EXISTS (SELECT 1 FROM products_families_obj fpo INNER JOIN products_families pf ON pf.ID=fpo.ID_ORG WHERE fpo.ID_Prod=p.ID AND pf.visivel=1) GROUP BY p.ID,p.Data_criacao ORDER BY p.Data_criacao DESC,p.ID DESC LIMIT 500",60);
-    $ids=array();
+    // Use the catalogue's four-field grouping only when requested by the homepage.
+    $uniqueFields=$unique?',DENSE_RANK() OVER (ORDER BY UPPER(TRIM(SUBSTRING_INDEX(SUBSTRING_INDEX(p.Ref, "_", 1), ",", -1))),IF(po.obj_promo_ativo=1 AND po.obj_promo>0,po.obj_promo,po.obj_pvp),UPPER(TRIM(COALESCE(p.estado, ""))),COALESCE(NULLIF(p.bateria, ""), 0)) AS duplicate_group':'';
+    $uniqueJoin=$unique?" INNER JOIN products_objs po ON po.obj_type_id=p.ID AND (po.obj_val2=0 OR po.obj_val2 IS NULL) AND po.obj_stock>0 AND po.obj_pvp>0 $filter":'';
+    $uniqueGroup=$unique?',p.Ref,p.estado,p.bateria,po.obj_promo_ativo,po.obj_promo,po.obj_pvp':'';
+    $rows=db_disc_rows("SELECT p.ID,p.Data_criacao,GROUP_CONCAT(DISTINCT CONCAT(pi.Ordem,':',pi.img_ext) ORDER BY pi.Ordem SEPARATOR ',') Images $uniqueFields FROM products p INNER JOIN products_lang pl ON pl.ID_PAI=p.ID LEFT JOIN products_images pi ON pi.ID_ORG=p.ID $uniqueJoin WHERE p.Aproved=1 AND pl.Lang='$lang' AND EXISTS (SELECT 1 FROM products_objs po WHERE po.obj_type_id=p.ID AND (po.obj_val2=0 OR po.obj_val2 IS NULL) AND po.obj_stock>0 AND po.obj_pvp>0 $filter) AND EXISTS (SELECT 1 FROM products_families_obj fpo INNER JOIN products_families pf ON pf.ID=fpo.ID_ORG WHERE fpo.ID_Prod=p.ID AND pf.visivel=1) GROUP BY p.ID,p.Data_criacao $uniqueGroup ORDER BY p.Data_criacao DESC,p.ID DESC LIMIT 500",60);
+    $ids=array();$seen=array();
     foreach($rows as $row){
-        if(db_disc_has_physical_image((int)$row['ID'],(string)($row['Images']??'')))$ids[]=(int)$row['ID'];
+        if(!db_disc_has_physical_image((int)$row['ID'],(string)($row['Images']??'')))continue;
+        if($unique){
+            $group=$row['duplicate_group'];
+            if(isset($seen[$group]) || isset($ids[(int)$row['ID']]))continue;
+            $seen[$group]=true;
+        }
+        $ids[(int)$row['ID']]=(int)$row['ID'];
         if(count($ids)>=120)break;
     }
-    return $memo[$kind]=$ids;
+    return $memo[$memoKey]=array_values($ids);
 }
 function db_disc_card_data($id) {
     static $requestCache=array();
@@ -174,7 +186,7 @@ function db_disc_home(){
     static $done=false;if($done)return;$done=true;
     echo '<div class="db-discovery db-discovery-home">';db_disc_nav();
     echo '<section><div class="db-disc-heading"><h2>Novidades</h2><a href="novidades.php">Ver todas →</a></div><div class="db-disc-grid db-disc-home-new">';
-    foreach(array_slice(db_disc_ids('novidades'),0,12) as $id)db_disc_card($id);echo '</div></section>';
+    foreach(array_slice(db_disc_ids('novidades',true),0,12) as $id)db_disc_card($id);echo '</div></section>';
     echo '<section><div class="db-disc-heading"><h2>Produtos em destaque</h2><a href="destaques.php">Ver mais →</a></div><div class="db-disc-minis">';
     $ids=array_slice(db_disc_ids('destaques'),0,4);foreach($ids as $id)db_disc_card($id,true);if(!$ids)echo '<p>Estamos a preparar novos destaques. Descobre entretanto as novidades.</p>';echo '</div></section>';
     echo '<section><div class="db-disc-heading"><div><h2>Áreas temáticas</h2><p>Inspira-te e explora as principais áreas da loja.</p></div><a href="categorias.php">Todas as categorias →</a></div><div class="db-disc-areas">';
