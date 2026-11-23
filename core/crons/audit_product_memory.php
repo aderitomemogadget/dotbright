@@ -1,9 +1,15 @@
 <?php
 /** Hourly catalogue memory audit. Analysis only; intentionally has no apply mode. */
-if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once dirname(__DIR__).'/product_memory_audit.php';
 
 function db_memory_audit_main(array $arguments) {
+    $web=PHP_SAPI!=='cli';
+    if($web){
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store, private');
+        header('X-Content-Type-Options: nosniff');
+        set_time_limit(0);
+    }
     date_default_timezone_set('Europe/Lisbon');
     $siteRoot=dirname(__DIR__,2);
     $options=array('output-dir'=>dirname($siteRoot).'/private/product-memory-audit','fixture'=>null);
@@ -16,13 +22,21 @@ function db_memory_audit_main(array $arguments) {
         $options[$match[1]]=$match[2];
     }
     $output=rtrim($options['output-dir'],'/\\');
-    if(!is_dir($output) && !mkdir($output,0700,true))throw new RuntimeException('Nao foi possivel criar a pasta do relatorio.');
-    $resolved=realpath($output);$site=realpath($siteRoot);
-    $normalise=function($value){return strtolower(str_replace('\\','/',rtrim($value,'/\\')));};
-    if($normalise($resolved)===$normalise($site) || strpos($normalise($resolved),$normalise($site).'/')===0)throw new RuntimeException('Os relatorios devem ficar fora da pasta publica do site.');
-    $lock=fopen($output.'/audit.lock','c');
+    // Browser runs stream the report directly, without requiring a writable private folder.
+    if(!$web){
+        if(!is_dir($output) && !mkdir($output,0700,true))throw new RuntimeException('Nao foi possivel criar a pasta do relatorio.');
+        $resolved=realpath($output);$site=realpath($siteRoot);
+        $normalise=function($value){return strtolower(str_replace('\\','/',rtrim($value,'/\\')));};
+        if($normalise($resolved)===$normalise($site) || strpos($normalise($resolved),$normalise($site).'/')===0)throw new RuntimeException('Os relatorios devem ficar fora da pasta publica do site.');
+    }
+    $lock=fopen(sys_get_temp_dir().'/dotbright-memory-audit-'.hash('sha256',$siteRoot).'.lock','c');
     if(!$lock)throw new RuntimeException('Nao foi possivel abrir o lock.');
-    if(!flock($lock,LOCK_EX | LOCK_NB)){fclose($lock);fwrite(STDERR,"Ja existe uma analise em curso.\n");return 4;}
+    if(!flock($lock,LOCK_EX | LOCK_NB)){
+        fclose($lock);
+        if($web){http_response_code(409);echo '<p>Ja existe uma analise em curso. Aguarde que termine e volte a abrir este URL.</p>';}
+        else fwrite(STDERR,"Ja existe uma analise em curso.\n");
+        return 4;
+    }
     $db=null;$html=null;$json=null;
     $run=(new DateTimeImmutable('now',new DateTimeZone('Europe/Lisbon')))->format('Ymd-His').'-'.getmypid();
     $base=$output.'/memory-'.$run;
@@ -60,24 +74,31 @@ function db_memory_audit_main(array $arguments) {
             })();$source='database';
         }
         $summary=array('mode'=>'analysis_only','source'=>$source,'started_at'=>date(DATE_ATOM),'missing_columns'=>$missing,'examined'=>0,'statuses'=>array('proposta'=>0,'rever'=>0,'sem_dados'=>0,'sem_alteracao'=>0));
-        $html=fopen($base.'.html.part','xb');$json=fopen($base.'.jsonl.part','xb');
-        if(!$html || !$json)throw new RuntimeException('Nao foi possivel criar os relatorios.');
+        $html=fopen($web?'php://output':$base.'.html.part',$web?'wb':'xb');
+        if(!$web)$json=fopen($base.'.jsonl.part','xb');
+        if(!$html || (!$web && !$json))throw new RuntimeException('Nao foi possivel criar os relatorios.');
         db_memory_audit_write($html,'<!doctype html><html lang="pt"><meta charset="utf-8"><title>Analise de memorias</title><style>body{font:14px system-ui;margin:24px;color:#17202a}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}th{background:#eee;position:sticky;top:0}tr[data-status="rever"]{background:#fff0d5}tr[data-status="proposta"]{background:#e8f7ed}td{min-width:90px}td:nth-child(4),td:nth-child(5){min-width:260px}</style><h1>Analise de RAM e armazenamento</h1><p>Apenas simulacao. Nenhum produto foi alterado. Valores em GB; 1 TB = 1024 GB. A capacidade atual reproduz a regra da ficha. RAM detetada significa RAM fisica.</p><p>Origem: '.$source.'. Execucao: '.$run.'</p><label>Estado: <select id="status"><option value="">Todos</option><option>proposta</option><option>rever</option><option>sem_dados</option><option>sem_alteracao</option></select></label><table><thead><tr>');
         foreach(array('ID','Referencia','Estado','Nome atual (PT)','Nome proposto','RAM atual','RAM detetada','Armazenamento atual','Armazenamento detetado','Capacidade atual na ficha','Capacidade proposta','Motivos / revisao','Evidencias') as $heading)db_memory_audit_write($html,'<th>'.$heading.'</th>');
         db_memory_audit_write($html,'</tr></thead><tbody>');
         foreach($products as $product){
             $row=db_memory_analyse($product);$summary['examined']++;$summary['statuses'][$row['status']]++;
-            db_memory_audit_write($json,json_encode($row,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)."\n");
+            if($json)db_memory_audit_write($json,json_encode($row,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)."\n");
             db_memory_audit_write($html,db_memory_html_row($row));
+            if($web && $summary['examined']%500===0){if(ob_get_level()>0)ob_flush();flush();}
         }
         if($db)$db->rollBack();
-        $summary['finished_at']=date(DATE_ATOM);$summary['reports']=array('html'=>$base.'.html','jsonl'=>$base.'.jsonl');
+        $summary['finished_at']=date(DATE_ATOM);
+        $summary['reports']=$web?array('delivery'=>'browser'):array('html'=>$base.'.html','jsonl'=>$base.'.jsonl');
         $encoded=json_encode($summary,JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         db_memory_audit_write($html,'</tbody></table><h2>Resumo</h2><pre>'.htmlspecialchars($encoded,ENT_QUOTES,'UTF-8').'</pre><script>document.getElementById("status").addEventListener("change",function(){document.querySelectorAll("tbody tr").forEach(row=>row.hidden=this.value!==""&&row.dataset.status!==this.value);});</script></html>');
-        fclose($html);$html=null;fclose($json);$json=null;
-        foreach(array('html','jsonl') as $extension)if(!rename($base.'.'.$extension.'.part',$base.'.'.$extension))throw new RuntimeException('Nao foi possivel finalizar o relatorio.');
-        if(file_put_contents($base.'.summary.json',$encoded."\n",LOCK_EX)===false)throw new RuntimeException('Nao foi possivel guardar o resumo.');
-        echo $encoded."\n";return 0;
+        fclose($html);$html=null;
+        if(!$web){
+            fclose($json);$json=null;
+            foreach(array('html','jsonl') as $extension)if(!rename($base.'.'.$extension.'.part',$base.'.'.$extension))throw new RuntimeException('Nao foi possivel finalizar o relatorio.');
+            if(file_put_contents($base.'.summary.json',$encoded."\n",LOCK_EX)===false)throw new RuntimeException('Nao foi possivel guardar o resumo.');
+            echo $encoded."\n";
+        }
+        return 0;
     }finally{
         if($db && $db->inTransaction())$db->rollBack();
         if(is_resource($html))fclose($html);if(is_resource($json))fclose($json);
@@ -88,5 +109,13 @@ function db_memory_audit_write($handle,$text) {
     $length=strlen($text);$offset=0;
     while($offset<$length){$written=fwrite($handle,substr($text,$offset));if($written===false || $written===0)throw new RuntimeException('Falha ao escrever relatorio.');$offset+=$written;}
 }
-try{exit(db_memory_audit_main(array_slice($argv,1)));}
-catch(Throwable $error){fwrite(STDERR,'Analise falhou (nenhum produto alterado). '.($error instanceof PDOException?'Falha na leitura da base de dados; verificar configuracao e permissoes.':$error->getMessage())."\n");exit(1);}
+try{exit(db_memory_audit_main(PHP_SAPI==='cli'?array_slice($argv,1):array()));}
+catch(Throwable $error){
+    $message='Analise falhou (nenhum produto alterado). '.($error instanceof PDOException?'Falha na leitura da base de dados; verificar configuracao e permissoes.':$error->getMessage());
+    if(PHP_SAPI==='cli')fwrite(STDERR,$message."\n");
+    else{
+        if(!headers_sent()){http_response_code(500);header('Content-Type: text/html; charset=utf-8');}
+        echo '<div role="alert"><strong>Analise interrompida: o relatorio nao esta completo.</strong><p>'.htmlspecialchars($message,ENT_QUOTES | ENT_SUBSTITUTE,'UTF-8').'</p></div>';
+    }
+    exit(1);
+}
