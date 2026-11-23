@@ -77,20 +77,68 @@ function db_memory_audit_main(array $arguments) {
         $html=fopen($web?'php://output':$base.'.html.part',$web?'wb':'xb');
         if(!$web)$json=fopen($base.'.jsonl.part','xb');
         if(!$html || (!$web && !$json))throw new RuntimeException('Nao foi possivel criar os relatorios.');
-        db_memory_audit_write($html,'<!doctype html><html lang="pt"><meta charset="utf-8"><title>Analise de memorias</title><style>body{font:14px system-ui;margin:24px;color:#17202a}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}th{background:#eee;position:sticky;top:0}tr[data-status="rever"]{background:#fff0d5}tr[data-status="proposta"]{background:#e8f7ed}td{min-width:90px}td:nth-child(4),td:nth-child(5){min-width:260px}</style><h1>Analise de RAM e armazenamento</h1><p>Apenas simulacao. Nenhum produto foi alterado. Valores em GB; 1 TB = 1024 GB. A capacidade atual reproduz a regra da ficha. RAM detetada significa RAM fisica.</p><p>Origem: '.$source.'. Execucao: '.$run.'</p><label>Estado: <select id="status"><option value="">Todos</option><option>proposta</option><option>rever</option><option>sem_dados</option><option>sem_alteracao</option></select></label><table><thead><tr>');
+        $pagination='<nav class="audit-pagination" aria-label="Paginacao de produtos"><button type="button" data-page="previous" disabled>Anterior</button><span data-page-info aria-live="polite">A analisar produtos…</span><button type="button" data-page="next" disabled>Seguinte</button><label>Ir para pagina: <input data-page-input type="number" min="1" value="1" disabled></label><span>20 produtos por pagina</span></nav>';
+        db_memory_audit_write($html,'<!doctype html><html lang="pt"><meta charset="utf-8"><title>Analise de memorias</title><style>body{font:14px system-ui;margin:24px;color:#17202a}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}th{background:#eee;position:sticky;top:0}tr[data-status="rever"]{background:#fff0d5}tr[data-status="proposta"]{background:#e8f7ed}td{min-width:90px}td:nth-child(4),td:nth-child(5){min-width:260px}.audit-pagination{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}.audit-pagination button{padding:7px 14px;cursor:pointer}.audit-pagination input{width:70px;padding:6px}.audit-table{overflow-x:auto}[hidden]{display:none!important}</style><h1>Analise de RAM e armazenamento</h1><p>Apenas simulacao. Nenhum produto foi alterado. Valores em GB; 1 TB = 1024 GB. A capacidade atual reproduz a regra da ficha. RAM detetada significa RAM fisica.</p><p>Origem: '.$source.'. Execucao: '.$run.'</p><label>Estado: <select id="status"><option value="">Todos</option><option>proposta</option><option>rever</option><option>sem_dados</option><option>sem_alteracao</option></select></label>'.$pagination.'<p id="audit-empty" hidden>Sem produtos neste estado.</p><div class="audit-table"><table><thead><tr>');
         foreach(array('ID','Referencia','Estado','Nome atual (PT)','Nome proposto','RAM atual','RAM detetada','Armazenamento atual','Armazenamento detetado','Capacidade atual na ficha','Capacidade proposta','Motivos / revisao','Evidencias') as $heading)db_memory_audit_write($html,'<th>'.$heading.'</th>');
         db_memory_audit_write($html,'</tr></thead><tbody>');
         foreach($products as $product){
             $row=db_memory_analyse($product);$summary['examined']++;$summary['statuses'][$row['status']]++;
             if($json)db_memory_audit_write($json,json_encode($row,JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR)."\n");
-            db_memory_audit_write($html,db_memory_html_row($row));
+            $rowHtml=db_memory_html_row($row);
+            // Keep the page short even while the full catalogue is still streaming.
+            if($summary['examined']>20)$rowHtml=str_replace('<tr ','<tr hidden ',$rowHtml);
+            db_memory_audit_write($html,$rowHtml);
             if($web && $summary['examined']%500===0){if(ob_get_level()>0)ob_flush();flush();}
         }
         if($db)$db->rollBack();
         $summary['finished_at']=date(DATE_ATOM);
         $summary['reports']=$web?array('delivery'=>'browser'):array('html'=>$base.'.html','jsonl'=>$base.'.jsonl');
         $encoded=json_encode($summary,JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        db_memory_audit_write($html,'</tbody></table><h2>Resumo</h2><pre>'.htmlspecialchars($encoded,ENT_QUOTES,'UTF-8').'</pre><script>document.getElementById("status").addEventListener("change",function(){document.querySelectorAll("tbody tr").forEach(row=>row.hidden=this.value!==""&&row.dataset.status!==this.value);});</script></html>');
+        db_memory_audit_write($html,'</tbody></table></div>'.$pagination.'<h2>Resumo</h2><pre>'.htmlspecialchars($encoded,ENT_QUOTES,'UTF-8').'</pre>');
+        db_memory_audit_write($html, <<<'HTML'
+<script>
+(function(){
+    const pageSize=20;
+    const body=document.querySelector('tbody');
+    const rows=Array.from(body.querySelectorAll('tr'));
+    const status=document.getElementById('status');
+    let filtered=rows;
+    let page=1;
+    function render(){
+        const total=filtered.length;
+        const pages=Math.ceil(total/pageSize);
+        page=Math.max(1,Math.min(page,pages||1));
+        const start=(page-1)*pageSize;
+        const visible=filtered.slice(start,start+pageSize);
+        visible.forEach(row=>row.hidden=false);
+        body.replaceChildren(...visible);
+        document.getElementById('audit-empty').hidden=total!==0;
+        document.querySelectorAll('[data-page-info]').forEach(info=>{
+            info.textContent='Pagina '+(pages?page:0)+' de '+pages+' · '+(total?start+1:0)+'–'+Math.min(start+pageSize,total)+' de '+total+' produtos';
+        });
+        document.querySelectorAll('[data-page="previous"]').forEach(button=>button.disabled=page<=1);
+        document.querySelectorAll('[data-page="next"]').forEach(button=>button.disabled=page>=pages);
+        document.querySelectorAll('[data-page-input]').forEach(input=>{
+            input.max=pages||1;input.value=page;input.disabled=pages===0;
+        });
+    }
+    status.addEventListener('change',function(){
+        filtered=rows.filter(row=>this.value===''||row.dataset.status===this.value);
+        page=1;render();
+    });
+    document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',function(){
+        page+=this.dataset.page==='next'?1:-1;render();
+        status.scrollIntoView({block:'start'});
+    }));
+    document.querySelectorAll('[data-page-input]').forEach(input=>input.addEventListener('change',function(){
+        page=Number.parseInt(this.value,10)||1;render();
+        status.scrollIntoView({block:'start'});
+    }));
+    render();
+})();
+</script></html>
+HTML
+        );
         fclose($html);$html=null;
         if(!$web){
             fclose($json);$json=null;
