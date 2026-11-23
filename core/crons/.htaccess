@@ -2,9 +2,3 @@
 #  Deny from all
 </Files>
 
-# Allow this read-only audit to run directly in the browser.
-<Files "audit_product_memory.php">
-    <IfModule mod_authz_core.c>
-        Require all granted
-    </IfModule>
-</Files>
