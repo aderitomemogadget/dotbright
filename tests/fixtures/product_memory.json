@@ -1,0 +1,12 @@
+[
+  {"ID":143644,"Ref":"EXEMPLO-SAMSUNG","name":"SAMSUNG GALAXY Z FOLD 8 5G 12GB/512GB (SM-F971B) GRAPHITE","description":"<p>Armazenamento: 512GB</p><p>Memória RAM: 12GB</p>","ram_gb":null,"storage_gb":null},
+  {"ID":143033,"Ref":"EXEMPLO-MOTOROLA","name":"(SEMINOVO) MOTOROLA MOTO G56 5G 14GB (8+4)/ 256GB (XT2529-2)","description":"","ram_gb":null,"storage_gb":null},
+  {"ID":3,"name":"Smartphone 12 GB RAM / 512 GB ROM","description":"Armazenamento: 512 GB RAM: 12 GB","ram_gb":12,"storage_gb":512},
+  {"ID":4,"name":"Galaxy 12GB/512GB","description":"Armazenamento: 256GB. RAM: 12GB"},
+  {"ID":5,"name":"Smartphone 8/256GB","description":""},
+  {"ID":6,"name":"Capa para Galaxy 12GB/512GB","description":""},
+  {"ID":7,"name":"Portátil 16GB RAM 1TB SSD","description":""},
+  {"ID":8,"name":"Cabo USB-C","description":"Cabo de 2 metros"},
+  {"ID":9,"name":"iPhone 256GB","description":""},
+  {"ID":10,"name":"<img src=x onerror=alert(1)> Galaxy 12GB/512GB & teste","description":"Armazenamento: 512GB. RAM: 12GB"}
+]

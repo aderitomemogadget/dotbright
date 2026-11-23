@@ -1,0 +1,3 @@
+# Substituir os caminhos e instalar no crontab do utilizador da loja.
+# Analise de TODOS os produtos ao minuto zero de cada hora; sem aplicacao.
+0 * * * * /usr/bin/php /CAMINHO/DO/SITE/core/crons/audit_product_memory.php >> /CAMINHO/PRIVADO/product-memory-audit-cron.log 2>&1
