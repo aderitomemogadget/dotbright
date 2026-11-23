@@ -12,11 +12,28 @@
 .mm-admin .mm-scan-panel{background:#f7f9fc;border:1px solid #e1e7ef;border-radius:9px;padding:20px;margin:24px 0}.mm-admin .mm-scan-panel .mm-tools{margin:0 0 14px}.mm-admin .mm-scan-panel p{color:#627287;margin:8px 0 0}.mm-admin .mm-progress-track{height:8px;background:#e0e7ef;border-radius:5px;overflow:hidden;margin-top:16px}.mm-admin .mm-progress-fill{height:100%;width:0;background:#1592bb;transition:width .2s}.mm-admin #mm-progress{display:block;margin-top:10px;font-weight:600}
 .mm-admin .mm-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:24px 0}.mm-admin .mm-stat{display:block;padding:15px;border:1px solid #e1e7ef;border-radius:8px;color:#627287;text-decoration:none;background:#fff}.mm-admin .mm-stat strong{display:block;color:#243d59;font-size:25px;line-height:1.3;margin-top:5px}.mm-admin .mm-stat[aria-current=page]{border-color:#1592bb;background:#f0f9fc}.mm-admin .mm-empty{padding:42px 20px;text-align:center;background:#fafbfd;border:1px dashed #cdd6e1;border-radius:8px}.mm-admin .mm-empty strong{display:block;font-size:18px;margin-bottom:8px}
 .mm-admin .mm-pagination{display:flex;position:static;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:#fff;color:#627287;min-height:58px;height:auto;padding:16px 0 0;margin:0;overflow:visible;border-top:1px solid #e8edf3;margin-top:20px}.mm-admin .mm-pagination-actions{display:flex;gap:10px}.mm-admin .mm-selection{color:#627287;margin-left:auto}.mm-admin .mm-status{display:inline-block;border-radius:20px;background:#edf3f9;color:#334f70;padding:4px 9px;font-size:12px;white-space:nowrap}.mm-admin :focus-visible{outline:3px solid #ed8b24;outline-offset:2px}.mm-admin [hidden]{display:none!important}
+.mm-admin .mm-help{padding:16px 18px;margin:18px 0;background:#f8fafc;border:1px solid #e1e7ef;border-left:3px solid #1592bb;border-radius:7px}.mm-admin .mm-help h2{font-size:15px;margin:0 0 8px}.mm-admin .mm-help p{color:#627287;font-size:13px;margin:6px 0}.mm-admin .mm-help details{margin:10px 0 0}.mm-admin .mm-help summary{color:#173f69;font-size:13px}.mm-admin .mm-help dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px;margin:16px 0 8px}.mm-admin .mm-help dt{font-weight:700;color:#25364a;margin-bottom:4px}.mm-admin .mm-help dd{font-size:13px;color:#627287;line-height:1.5;margin:0}@media(max-width:900px){.mm-admin .mm-help dl{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.mm-admin .mm-help dl{grid-template-columns:1fr}}
 @media(max-width:1100px){.mm-admin .mm-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.mm-admin{padding:16px}.mm-admin .mm-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.mm-admin .mm-tools>label{width:100%;max-width:none}.mm-admin .mm-pagination{align-items:flex-start;flex-direction:column}.mm-admin .mm-selection{margin-left:0}}
 </style>
 <section class="mm-admin">
 <h1>RAM e armazenamento</h1>
 <p class="mm-subtitle">Analisa as memórias do catálogo, compara os valores e revê as correções propostas. Os produtos só mudam quando aprovas e aplicas uma proposta.</p>
+<aside class="mm-help" aria-labelledby="mm-help-title">
+<h2 id="mm-help-title">Como funciona esta área</h2>
+<p><strong>1. Analisa o catálogo</strong> para gerar propostas. <strong>2. Abre e confirma os valores</strong>, corrigindo o que for necessário. <strong>3. Aprova e aplica</strong> apenas as propostas que validaste.</p>
+<p>Analisar e guardar uma proposta não altera o produto. RAM é a memória física; armazenamento é a capacidade para ficheiros e aplicações. Os valores são indicados em GB.</p>
+<details><summary>O que significa cada estado?</summary>
+<dl>
+<div><dt>Por aprovar</dt><dd>Proposta pronta para validação e aplicação. O produto ainda não foi alterado. Também inclui propostas editadas e guardadas manualmente.</dd></div>
+<div><dt>Para revisão</dt><dd>Há dados ambíguos, contraditórios ou insuficientes. Abre a proposta, confirma e preenche os valores; ao guardar, passa a Por aprovar.</dd></div>
+<div><dt>Aplicada</dt><dd>A correção já foi aplicada ao nome e/ou às memórias do produto. Os valores anteriores ficam registados no histórico.</dd></div>
+<div><dt>Rejeitada</dt><dd>A proposta foi recusada sem alterar o produto. Não é recriada automaticamente enquanto os dados de origem forem os mesmos.</dd></div>
+<div><dt>Revertida</dt><dd>Uma correção aplicada foi desfeita e os valores anteriores foram repostos. A reversão é bloqueada se esses campos mudaram entretanto.</dd></div>
+<div><dt>Desatualizada</dt><dd>O produto mudou desde a análise, ou outra correção foi aplicada ou revertida. Executa uma nova análise para obter uma proposta atual.</dd></div>
+</dl>
+<p>Clica num cartão para filtrar por estado, ou escolhe o estado e clica em <strong>Filtrar</strong>. <strong>Todos</strong> reúne os vários estados; não é um estado da proposta.</p>
+</details>
+</aside>
 <?php foreach($mm_notices as $message){ ?><p class="mm-note" role="status"><?=mm_escape($message)?></p><?php } ?>
 <?php if($mm_error){ ?><p class="mm-error" role="alert"><?=mm_escape($mm_error)?></p><?php } ?>
 <?php if($mm_ready && !$mm_can_apply){ ?><div class="mm-note"><strong>Análise e revisão disponíveis.</strong> A aplicação das correções aguarda a preparação da base de dados.<details><summary>Ver requisito para aplicar correções</summary><p><?=mm_escape(implode(', ',$mm_write_blockers))?> precisa de InnoDB para permitir a aplicação e reversão em transação.</p></details></div><?php } ?>
