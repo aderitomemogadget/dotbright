@@ -1,5 +1,6 @@
 <?php
 if(isset($_SERVER['SCRIPT_FILENAME']) && $_SERVER['SCRIPT_FILENAME'] == __FILE__ ) exit();
+require_once __DIR__.'/../../../core/product_memory_management.php';
 function containsDecimal($value)
 {
     $dec=explode('.', $value);
@@ -2385,6 +2386,8 @@ function ficha_p1_final($prods,$labels='')
 					$return .= '</div>';
 					$capacidade = '';
 					if (preg_match("/\b(\d+GB)\b/", $prods['prod_nome'], $matches)) $capacidade = $matches[0];
+					$stored_capacity=db_memory_storage_for_product((int)$prods['prod_id']);
+					if($stored_capacity!==null)$capacidade=$stored_capacity;
 					/*
 					$cores = [
 						'black' => ['black', 'preto'],
@@ -3000,6 +3003,8 @@ function ficha_p1_final($prods,$labels='')
 
 					$capacidade = '';
 					if (preg_match("/\b(\d+GB)\b/", $prods['prod_nome'], $matches)) $capacidade = $matches[0];
+					$stored_capacity=db_memory_storage_for_product((int)$prods['prod_id']);
+					if($stored_capacity!==null)$capacidade=$stored_capacity;
 
 					/*
 					$cores = [

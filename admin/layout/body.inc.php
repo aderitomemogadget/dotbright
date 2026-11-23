@@ -385,6 +385,14 @@ echo comprime('</div></div></div>');
 	}
 	if( (isset($dados['Permissoes'][8]) && $dados['Permissoes'][8]==1)  && $tem_loja)
 	{
+		$tabs[$m][0]="RAM e armazenamento";
+		$tabs[$m][1]=$site_http_url."admin/product_memory/list.php";
+		$tabs[$m][2]='fas fa-memory';
+		$tabs[$m][3]='';
+		$m++;
+	}
+	if( (isset($dados['Permissoes'][8]) && $dados['Permissoes'][8]==1)  && $tem_loja)
+	{
 		$tabs[$m][0]="Produtos";
 		$tabs[$m][1]="#";
 		$tabs[$m][2]='fas fa-dolly';
