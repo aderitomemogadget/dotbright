@@ -1204,6 +1204,8 @@ function sequra_product_widget($prods, $display_price = null)
 {
     if (empty($GLOBALS['sequra_product_widget_config']) ||
         (isset($_GET['amp']) && (int) $_GET['amp'] === 1) || empty($prods['prod_carrinho'])) return '';
+    require_once __DIR__ . '/../../../external_api/pagamentos/pgm_sequra/sequra_lib.php';
+    if (!sequra_products_eligible(array($prods['prod_id']))) return '';
     if ($display_price === null && isset($prods['prod_precos'])) {
         $prices = $prods['prod_precos'];
         $display_price = $prices['PVP'];

@@ -173,7 +173,7 @@ function showLayoutMetodosPagamento($metodoPagamento, $sequra_context = null)
                     $tipo=$rs->db_data['Tipo'];
 
                     if (defined('MP_TP_SEQURA') && (int) $tipo === (int) MP_TP_SEQURA &&
-                        (!is_array($sequra_context) || !sequra_method_access_allowed($rs->db_data) || !sequra_checkout_eligible(
+                        (!is_array($sequra_context) || !sequra_method_access_allowed($rs->db_data) || !sequra_cart_products_eligible() || !sequra_checkout_eligible(
                             sequra_checkout_total($sequra_context, $rs->db_data),
                             $sequra_context['billing_country'], $sequra_context['delivery_country'])))
                     {

@@ -20,6 +20,54 @@ function sequra_valid_order_token($enc_id, $token)
     return $expected !== '' && is_string($token) && hash_equals($expected, $token);
 }
 
+function sequra_products_eligible($product_ids)
+{
+    // Mobilidade and every descendant are excluded, including secondary family assignments.
+    $ids = array();
+    foreach ($product_ids as $id) if ((int) $id > 0) $ids[(int) $id] = (int) $id;
+    if (!$ids) return true;
+    sort($ids, SORT_NUMERIC);
+    static $cache = array();
+    $key = implode(',', $ids);
+    if (isset($cache[$key])) return $cache[$key];
+    $db_link = db_opendb_conection($GLOBALS['DB_host'], $GLOBALS['DB_user'], $GLOBALS['DB_pass']);
+    $rs = new DataObj;
+    $rs->db_open($db_link, $GLOBALS['DB_name'], 'SELECT DISTINCT ID_ORG FROM products_families_obj WHERE ID_PROD IN (' . $key . ')');
+    $pending = array();
+    while (!$rs->EOF()) {
+        $id = (int) $rs->db_data['ID_ORG'];
+        if ($id > 0) $pending[$id] = $id;
+        $rs->db_next();
+    }
+    $rs->db_close();
+    $visited = array();
+    while ($pending) {
+        if (isset($pending[3453])) return $cache[$key] = false;
+        foreach ($pending as $id) $visited[$id] = true;
+        $rs->db_open($db_link, $GLOBALS['DB_name'], 'SELECT ID, ID_ORG FROM products_families WHERE ID IN (' . implode(',', $pending) . ')');
+        $pending = array();
+        while (!$rs->EOF()) {
+            $parent = (int) $rs->db_data['ID_ORG'];
+            if ($parent === 3453) { $rs->db_close(); return $cache[$key] = false; }
+            if ($parent > 0 && !isset($visited[$parent])) $pending[$parent] = $parent;
+            $rs->db_next();
+        }
+        $rs->db_close();
+    }
+    return $cache[$key] = true;
+}
+
+function sequra_cart_products_eligible()
+{
+    $ids = array();
+    if (isset($GLOBALS['shop']) && is_array($GLOBALS['shop'])) {
+        foreach ($GLOBALS['shop'] as $index=>$item) {
+            if ((int) $index > 0 && is_array($item) && isset($item[1], $item[2]) && (float) $item[2] > 0) $ids[] = (int) $item[1];
+        }
+    }
+    return sequra_products_eligible($ids);
+}
+
 function sequra_checkout_eligible($total, $billing_country, $delivery_country)
 {
     // country_zones uses 165 for Portugal throughout this store.
@@ -45,6 +93,17 @@ function sequra_order_eligible($enc_id)
     $eligible = !$rs->EOF() && (int) $rs->db_data['Tipo'] === (int) MP_TP_SEQURA &&
         sequra_checkout_eligible($rs->db_data['TotalDocComIva'], $rs->db_data['enc_Pais'], $rs->db_data['enc_Pais_ent']);
     $rs->db_close();
+    if ($eligible) {
+        $rs->db_open($db_link, $GLOBALS['DB_name'], "SELECT ID_Produto, ID_Produto_Pai FROM encomendas_produtos WHERE ID_PAI='" . (int) $enc_id . "' AND Qtd>0");
+        $ids = array();
+        while (!$rs->EOF()) {
+            $ids[] = (int) $rs->db_data['ID_Produto'];
+            $ids[] = (int) $rs->db_data['ID_Produto_Pai'];
+            $rs->db_next();
+        }
+        $rs->db_close();
+        $eligible = sequra_products_eligible($ids);
+    }
     return $eligible;
 }
 

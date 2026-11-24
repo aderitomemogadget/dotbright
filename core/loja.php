@@ -3032,7 +3032,7 @@ function carrinho_purchase()
 								'fee_base'=>$totalEncomenda['TOTALCIVA'], 'billing_country'=>$sequra_billing_country,
 								'delivery_country'=>$sequra_delivery_country);
 							if ((int) $metodoPagamentoObj['Tipo'] === (int) MP_TP_SEQURA &&
-								(!sequra_method_access_allowed($metodoPagamentoObj) ||
+                                (!sequra_method_access_allowed($metodoPagamentoObj) || !sequra_cart_products_eligible() ||
 								!sequra_checkout_eligible($sequra_cart_total, $sequra_billing_country, $sequra_delivery_country)))
 							{
 								$m_metodopagamento = 0;
