@@ -7065,7 +7065,7 @@ function showInfoEncomenda($enc_id,$width='100%',$external=0,$extramsg="")
 			$messagebody .= '</table>';
 		}
 		$m_pagamento_tipo=getNomeMetodoPagamentoByTipo_ID($Metodo_pagamento);
-		if($m_pagamento_tipo == MP_TP_TRANS_BANCARIA || $m_pagamento_tipo == MP_TP_MB_LUSOPAY || $m_pagamento_tipo == MP_TP_MB_IFTHEN || $m_pagamento_tipo == MP_TP_MB_EASYPAY || $m_pagamento_tipo == MP_TP_MB_SIBS || $m_pagamento_tipo == MP_TP_MB_EUPAGO || $m_pagamento_tipo == MP_TP_PAYSHOP_IFTHEN)
+		if($m_pagamento_tipo == MP_TP_TRANS_BANCARIA || $m_pagamento_tipo == MP_TP_MB_LUSOPAY || $m_pagamento_tipo == MP_TP_MB_IFTHEN || $m_pagamento_tipo == MP_TP_MB_EASYPAY || $m_pagamento_tipo == MP_TP_MB_SIBS || (defined('MP_TP_MB_EUPAGO') && $m_pagamento_tipo == constant('MP_TP_MB_EUPAGO')) || (defined('MP_TP_PAYSHOP_IFTHEN') && $m_pagamento_tipo == constant('MP_TP_PAYSHOP_IFTHEN')))
 		{
 			$messagebody .= '<table width="'.$width.'" cellspacing="0" cellpadding="0" border="0">';
 			$messagebody .= '<tr style="border:1px solid #d6d5d5">';

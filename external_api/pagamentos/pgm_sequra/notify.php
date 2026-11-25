@@ -70,12 +70,40 @@ $sequra_ipn_diag_mark('local_update_start');
 $local = sequra_update_local_order($enc_id, $paid, $local_state, $status);
 $sequra_ipn_diag_mark($local['ok'] ? 'local_update_ok' : 'local_update_failed');
 if (!$local['ok']) { http_response_code(500); echo json_encode(array('ok'=>false)); exit; }
+// Confirmation and local persistence succeeded. Secondary failures must not request another IPN.
+$sequra_ipn_secondary_error = function ($stage, $error) use ($enc_id, $sequra_ipn_diag_mark) {
+    $sequra_ipn_diag_mark($stage);
+    error_log('[SEQURA_IPN_SECONDARY_ERROR] ' . json_encode(array(
+        'order'=>(int) $enc_id, 'stage'=>$stage,
+        'file'=>basename($error->getFile()), 'line'=>(int) $error->getLine()
+    )));
+};
 if ($local['became_paid'] && function_exists('enviarEmailCliente')) {
     $sequra_ipn_diag_mark('email_start');
-    enviarEmailCliente($enc_id);
-    $sequra_ipn_diag_mark('email_returned');
+    $email_error = null;
+    $email_buffer_level = ob_get_level();
+    ob_start();
+    try {
+        enviarEmailCliente($enc_id);
+    } catch (Exception $error) {
+        $email_error = $error;
+    } catch (Throwable $error) {
+        // PHP 7+ Error/TypeError, including undefined payment constants.
+        $email_error = $error;
+    }
+    // Mail helpers may print SMTP errors; never include them in the IPN response.
+    while (ob_get_level() > $email_buffer_level) ob_end_clean();
+    if ($email_error !== null) $sequra_ipn_secondary_error('email_failed', $email_error);
+    else $sequra_ipn_diag_mark('email_returned');
 }
 $sequra_ipn_diag_mark('final_log_start');
-sequra_log($enc_id, sequra_order_reference($enc_id), $data, '', 'IPN_' . strtoupper($target_state), '');
+try {
+    sequra_log($enc_id, sequra_order_reference($enc_id), $data, '', 'IPN_' . strtoupper($target_state), '');
+} catch (Exception $error) {
+    $sequra_ipn_secondary_error('final_log_failed', $error);
+} catch (Throwable $error) {
+    $sequra_ipn_secondary_error('final_log_failed', $error);
+}
 $sequra_ipn_diag_mark('response_success');
+http_response_code(200);
 echo json_encode(array('ok'=>true));
